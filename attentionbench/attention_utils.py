@@ -11,6 +11,8 @@ class AttentionConfig:
     N: int
     K1: int
     K2: int
+    M_tile: int
+    K2_tile: int
     dtype: str
 
     def get_name(self) -> str:
@@ -135,6 +137,8 @@ def generate_mlir(config: AttentionConfig, tuning: Optional[TuningSpec] = None):
 
 func.func @main(%Q : !Q, %K : !K, %V : !V) -> !O {{
   %scale = arith.constant 1.0 : !dtype
+  //%c1 = arith.constant 1 : index
+  //%size1 = tensor.dim %Q, %c1 : !O
   %empty = tensor.empty() : !O
   %O = iree_linalg_ext.attention 
        {{ indexing_maps = [#Q, #K, #V, #S, #O]
@@ -168,7 +172,10 @@ def compile_attention_config(
 
     # TODO: Use different tuning specs for different configs. This is just a
     # general tuning config that worked well for sdxl shapes.
-    spec = TuningSpec([1, 128, 0, 0, 0], [0, 0, 0, 0, 32], 4, 1, "MFMA_F32_32x32x8_F16", 2, True)
+    if config.M_tile == 16:
+        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], 4, 1, "MFMA_F32_16x16x16_F16", 2, True)
+    else:
+        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], 4, 1, "MFMA_F32_32x32x8_F16", 2, True)
     # Generate mlir content
     mlir_content = generate_mlir(config, spec)
 
