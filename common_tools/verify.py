@@ -2,19 +2,11 @@ import os
 import tempfile
 import numpy as np
 from typing import List
-from tqdm import tqdm
 from multiprocessing import Pool, cpu_count, Manager
-import logging
-import itertools
-from pathlib import Path
-import csv
 import argparse
-import sys
 from utils import *
-from attention_utils import *
-from problems import get_attention_configs
 
-def compile_attention_mlir_file(mlir_file : str):
+def compile_attention_mlir_file(mlir_file : str, target_device: str, hip_target: str, extra_flags: list):
     vmfb_file = os.path.splitext(mlir_file)[0] + ".vmfb"
     exec_args = [
     "iree-compile",
@@ -24,10 +16,10 @@ def compile_attention_mlir_file(mlir_file : str):
     "-o",
     f"{vmfb_file}",
     # Target Device: hip
-    "--iree-hal-target-device=hip",
+    f"--iree-hal-target-device={target_device}",
     # Device: MI300x
-    "--iree-hip-target=gfx942",
-    ] + get_attention_flags()
+    f"--iree-hip-target={hip_target}",
+    ] + extra_flags
     ret_value, stdout, stderr = run_iree_command(exec_args)
     if ret_value == 0:
         print(f"Successfully compiled {mlir_file} to {vmfb_file}")
@@ -36,11 +28,11 @@ def compile_attention_mlir_file(mlir_file : str):
         return None
     return vmfb_file
 
-def get_output_npy(vmfb_file : str, inputs : List[str]):
+def get_output_npy(vmfb_file : str, inputs : List[str], target_device: str):
     with tempfile.NamedTemporaryFile(suffix='.npy', delete=False) as out:
         exec_args = [
             "iree-run-module",
-            f"--device=hip",
+            f"--device={target_device}",
             "--device_allocator=caching",
             f"--module={vmfb_file}",
             "--function=main",
@@ -83,23 +75,32 @@ def close_files(files):
         os.remove(file.name)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Verify numerical results of a mlir program with a reference mlir program")
+    parser = argparse.ArgumentParser(
+        description="""Verify numerical results of a mlir program with a reference mlir program.
+                       NOTE: the main function should accept same typed tensors for this to work."""
+    )
     parser.add_argument("--mlir-uut", help="The unit under test", type=str, required=True)
     parser.add_argument("--mlir-ref", help="The reference mlir file", type=str, required=True)
     parser.add_argument("--input-shape", help="input shape(s)", type=str, action='append', required=True)
+    parser.add_argument("--device", help="iree device", type=str, default="hip")
+    parser.add_argument("--hip-target", help="iree hip target", type=str, default="gfx942")
+    parser.add_argument("--extra-compiler-flags", help="extra iree-compile flags", type=str, action='append', default="--iree-codegen-gpu-native-math-precision")
 
     args = parser.parse_args()
     mlir_uut_file = args.mlir_uut
-    mlir_uut_vmfb = compile_attention_mlir_file(mlir_uut_file)
+    extra_compiler_flags = args.extra_compiler_flags
+    if type(extra_compiler_flags) == str:
+        extra_compiler_flags = [extra_compiler_flags]
+    mlir_uut_vmfb = compile_attention_mlir_file(mlir_uut_file, args.device, args.hip_target, extra_compiler_flags)
     mlir_ref_file = args.mlir_ref
-    mlir_ref_vmfb = compile_attention_mlir_file(mlir_ref_file)
+    mlir_ref_vmfb = compile_attention_mlir_file(mlir_ref_file, args.device, args.hip_target, extra_compiler_flags)
 
     shape_strs = args.input_shape
     shapes = get_shapes(shape_strs)
     inputfiles = create_test_inputs(shapes)
 
-    mlir_uut_out_file = get_output_npy(mlir_uut_vmfb, inputfiles)
-    mlir_ref_out_file = get_output_npy(mlir_ref_vmfb, inputfiles)
+    mlir_uut_out_file = get_output_npy(mlir_uut_vmfb, inputfiles, args.device)
+    mlir_ref_out_file = get_output_npy(mlir_ref_vmfb, inputfiles, args.device)
 
     uut_out = np.load(mlir_uut_out_file.name)
     print("uut:")
