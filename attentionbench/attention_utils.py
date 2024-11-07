@@ -2,6 +2,7 @@ from utils import *
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+import math
 
 
 @dataclass
@@ -16,7 +17,7 @@ class AttentionConfig:
     dtype: str
 
     def get_name(self) -> str:
-        return f"attention_{self.B}x{self.M}x{self.N}x{self.K1}x{self.K2}x{self.dtype}"
+        return f"attention_{self.B}x{self.M}x{self.N}x{self.K1}x{self.K2}x{self.dtype}_Mtile_{self.M_tile}"
 
     def get_query_shape(self) -> str:
         return f"{self.B}x{self.M}x{self.K1}x{self.dtype}"
@@ -172,10 +173,24 @@ def compile_attention_config(
 
     # TODO: Use different tuning specs for different configs. This is just a
     # general tuning config that worked well for sdxl shapes.
-    if config.M_tile == 16:
-        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], 4, 1, "MFMA_F32_16x16x16_F16", 2, True)
+    spec = None
+
+    if(config.M >= 32 * 4):
+        m_warps = 4
+        m_per_warp = 32
+    elif(config.M >= 16 * 4):
+        m_warps = 4
+        m_per_warp = 16
+    elif(config.M >= 16):
+        m_per_warp = 16
+        m_warps = int(2**math.floor(math.log2(config.M / m_per_warp)))
     else:
-        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], 4, 1, "MFMA_F32_32x32x8_F16", 2, True)
+        assert(False and "M should be larger than 16")
+
+    if m_per_warp == 16:
+        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], m_warps, 1, "MFMA_F32_16x16x16_F16", 2, True)
+    elif m_per_warp == 32:
+        spec = TuningSpec([1, config.M_tile, 0, 0, 0], [0, 0, 0, 0, 32], m_warps, 1, "MFMA_F32_32x32x8_F16", 2, True)
     # Generate mlir content
     mlir_content = generate_mlir(config, spec)
 

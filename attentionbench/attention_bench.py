@@ -109,32 +109,33 @@ if __name__ == "__main__":
         ret_value, cmd_out, cmd_err = run_iree_command(exec_args)
         ok = ret_value == 0
         benchmark_gemm_mean_time_ms = bench_summary_process(ret_value, cmd_out)
-        benchmark_gemm_mean_time_us = benchmark_gemm_mean_time_ms * 1000
+        if benchmark_gemm_mean_time_ms:
+            benchmark_gemm_mean_time_us = benchmark_gemm_mean_time_ms * 1000
 
-        flops = config.get_flops()
-        byte_count = config.get_byte_count()
+            flops = config.get_flops()
+            byte_count = config.get_byte_count()
 
-        arithmetic_intensity = flops / byte_count
-        tflops_per_second = (flops / 1e12) / (benchmark_gemm_mean_time_us / 1e6)
+            arithmetic_intensity = flops / byte_count
+            tflops_per_second = (flops / 1e12) / (benchmark_gemm_mean_time_us / 1e6)
 
-        results.append(
-            (
-                index,
-                tag,
-                name,
-                config.B,
-                config.M,
-                config.N,
-                config.K1,
-                config.K2,
-                config.dtype,
-                round(benchmark_gemm_mean_time_us, 4),
-                round(arithmetic_intensity, 4),
-                round(tflops_per_second, 4),
-                ok,
+            results.append(
+                (
+                    index,
+                    tag,
+                    name,
+                    config.B,
+                    config.M,
+                    config.N,
+                    config.K1,
+                    config.K2,
+                    config.dtype,
+                    round(benchmark_gemm_mean_time_us, 4),
+                    round(arithmetic_intensity, 4),
+                    round(tflops_per_second, 4),
+                    ok,
+                )
             )
-        )
-        index += 1
+            index += 1
 
     fieldnames = [
         "index",

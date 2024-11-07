@@ -4,16 +4,20 @@ from attention_utils import AttentionConfig
 def llm_sweep(dtype: str) -> list[AttentionConfig]:
     configs = []
     # Batch sweep (batch * num_heads)
-    for B in [1, 2, 4, 8, 16, 32, 48, 64, 96, 128, 192]:
+    for B in [1, 4, 16]:
         # M, K2 sweep (seq length)
-        for M in [1024, 2048, 3072, 4096, 5120, 6144, 7168, 8192, 16384]:
-            K2 = M
-            # K1, N sweep (head dim)
-            for N in [64, 128]:
-                K1 = N
-                for M_tile in [16, 32, 64, 128]:
-                    for K2_tile in [32]:
-                        configs.append(AttentionConfig(B, M, N, K1, K2, M_tile, K2_tile, dtype))
+        for M in [16, 32, 64, 128]:
+            for K2 in [1024, 4096, 16384]:
+                # K1, N sweep (head dim)
+                for N in [64, 128, 256, 512]:
+                    K1 = N
+                    for M_tile in [16, 32, 64, 128]:
+                        if(M_tile > M and M >= 16):
+                            continue
+                        if(M < 16):
+                            M_tile = M
+                        for K2_tile in [32]:
+                            configs.append(AttentionConfig(B, M, N, K1, K2, M_tile, K2_tile, dtype))
     return configs
 
 

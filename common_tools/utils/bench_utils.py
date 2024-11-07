@@ -24,6 +24,7 @@ BenchmarkResult = namedtuple(
 
 def run_iree_command(args: Sequence[str] = ()):
     command = "Exec:", " ".join(args)
+    print(command)
     logging.getLogger().info(command)
     proc = subprocess.run(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False
@@ -40,8 +41,8 @@ def run_iree_command(args: Sequence[str] = ()):
         return 0, proc.stdout, proc.stderr
     logging.getLogger().error(
         f"Command failed!\n"
-        f"Stderr diagnostics:\n{proc.stderr}\n"
-        f"Stdout diagnostics:\n{proc.stdout}\n"
+        # f"Stderr diagnostics:\n{proc.stderr}\n"
+        # f"Stdout diagnostics:\n{proc.stdout}\n"
     )
     return 1, proc.stdout, proc.stderr
 
