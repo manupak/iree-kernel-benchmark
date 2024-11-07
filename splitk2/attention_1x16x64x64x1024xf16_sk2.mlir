@@ -49,26 +49,26 @@ func.func @main(%Q : !Q, %K : !K, %V : !V) -> !O {
   %rowsum_sk_0 = linalg.fill ins(%c0 : f32) outs(%rowsum_sk : !ROWRED_SK) -> !ROWRED_SK
 
   %O_SK:3 = iree_linalg_ext.online_attention 
-          {
-            indexing_maps = [
-              #Q_SK, 
-              #K_SK, 
-              #V_SK, 
-              #S_SK, 
-              #O_SK,
-              #ROWRED,
-              #ROWRED
-            ],
-            decomposition_config = {
-              pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [1]}>}, 
-              qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [0, 1]}>}
-            }, 
-            compilation_info = #tuning
-          }
-          ins(%Q, %K_SK, %V_SK, %scale : !Q, !K_SK, !V_SK, !dtype) outs(%empty_sk_0, %rowmax_sk_0, %rowsum_sk_0 : !O_SK, !ROWRED_SK, !ROWRED_SK) {
-            ^bb0(%arg4: f32):
-              iree_linalg_ext.yield %arg4 : f32
-          } -> !O_SK, !ROWRED_SK, !ROWRED_SK
+  {
+    indexing_maps = [
+      #Q_SK, 
+      #K_SK, 
+      #V_SK, 
+      #S_SK, 
+      #O_SK,
+      #ROWRED,
+      #ROWRED
+    ],
+    decomposition_config = {
+      pv_attrs = {attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [1]}>}, 
+      qk_attrs = {attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, subgroup_m_count = 1, subgroup_n_count = 1, promote_operands = [0, 1]}>}
+    }, 
+    compilation_info = #tuning
+  }
+  ins(%Q, %K_SK, %V_SK, %scale : !Q, !K_SK, !V_SK, !dtype) outs(%empty_sk_0, %rowmax_sk_0, %rowsum_sk_0 : !O_SK, !ROWRED_SK, !ROWRED_SK) {
+    ^bb0(%arg4: f32):
+      iree_linalg_ext.yield %arg4 : f32
+  } -> !O_SK, !ROWRED_SK, !ROWRED_SK
   
   // Get max of all split-k s
   // Split-k recombiner maps
